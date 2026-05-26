@@ -20,17 +20,25 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Install Android SDK platform 36 and build-tools
+      - name: Accept Android SDK licenses
+        run: yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Install Android SDK platform 36
         run: |
-          echo "y" | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
             "platforms;android-36" \
-            "build-tools;36.0.0" \
-            --sdk_root=${ANDROID_HOME}
+            "build-tools;35.0.0" || \
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Setup Gradle 8.14
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14'
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 8.14
 
       - name: Decode debug keystore
         run: base64 -d debug.keystore.base64 > debug.keystore
@@ -39,7 +47,7 @@ jobs:
         run: echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY || 'placeholder_key' }}" > .env
 
       - name: Build Debug APK
-        run: gradle assembleDebug
+        run: ./gradlew assembleDebug --no-configuration-cache --no-build-cache --info 2>&1 | tail -100
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
