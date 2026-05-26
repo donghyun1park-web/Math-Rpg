@@ -1,8 +1,9 @@
 package com.example.ui
 
+import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioTrack
+import kotlinx.coroutines.SupervisorJob
 import android.util.Log
 import kotlinx.coroutines.*
 import kotlin.math.sin
@@ -12,14 +13,18 @@ object SoundSynth {
     private var isMuted = false
     private var bgmJob: Job? = null
     private var currentBgmType: String? = null // "MAP", "BATTLE", null
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     fun setMuted(muted: Boolean) {
         isMuted = muted
         if (muted) {
             stopBgm()
-        } else {
-            // Bgm will resume or can be restarted by ViewModel
         }
+    }
+
+    fun release() {
+        stopBgm()
+        scope.cancel()
     }
 
     fun isMuted(): Boolean = isMuted
@@ -28,25 +33,33 @@ object SoundSynth {
     private fun playBuffer(buffer: ShortArray) {
         if (isMuted) return
         try {
-            val track = AudioTrack(
-                AudioManager.STREAM_MUSIC,
-                SAMPLE_RATE,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                buffer.size * 2,
-                AudioTrack.MODE_STATIC
-            )
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(SAMPLE_RATE)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(buffer.size * 2)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
             track.write(buffer, 0, buffer.size)
             track.play()
-            
-            // Auto release after the length of the audio track has finished
-            GlobalScope.launch(Dispatchers.IO) {
+
+            scope.launch(Dispatchers.IO) {
                 delay((buffer.size * 1000L) / SAMPLE_RATE + 150L)
                 try {
                     track.stop()
                     track.release()
                 } catch (e: Exception) {
-                    // Ignore already released/stopped exception
+                    // ignore already-released track
                 }
             }
         } catch (e: Exception) {
@@ -205,33 +218,47 @@ object SoundSynth {
     fun startBgm(type: String) {
         if (isMuted) return
         if (currentBgmType == type && bgmJob?.isActive == true) return
-        
+
         stopBgm()
         currentBgmType = type
-        
-        bgmJob = GlobalScope.launch(Dispatchers.Default) {
+
+        // Size the internal buffer to hold exactly 2 notes (double-buffering).
+        // This makes write() block naturally at the right pace, eliminating drift.
+        val noteLengthMs = if (type == "MAP") 450 else 300
+        val noteBytes = (SAMPLE_RATE * (noteLengthMs / 1000f)).toInt() * 2
+        val bgmBufferBytes = noteBytes * 2
+
+        bgmJob = scope.launch {
             try {
-                val bgmTrack = AudioTrack(
-                    AudioManager.STREAM_MUSIC,
-                    SAMPLE_RATE,
-                    AudioFormat.CHANNEL_OUT_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                    4096 * 4,
-                    AudioTrack.MODE_STREAM
-                )
+                val bgmTrack = AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_GAME)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(SAMPLE_RATE)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(bgmBufferBytes)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
                 bgmTrack.play()
 
                 if (type == "MAP") {
                     // Soft forest exploration lullaby arpeggio melody (loopable)
                     val melody = floatArrayOf(261.63f, 293.66f, 329.63f, 392.00f, 440.00f, 392.00f, 329.63f, 293.66f)
                     var melodyIdx = 0
-                    
+
                     while (isActive && !isMuted && currentBgmType == "MAP") {
                         val freq = melody[melodyIdx]
-                        val noteLengthMs = 450
                         val bufSize = (SAMPLE_RATE * (noteLengthMs / 1000f)).toInt()
                         val soundBuffer = ShortArray(bufSize)
-                        
+
                         for (i in 0 until bufSize) {
                             val t = i.toFloat() / SAMPLE_RATE
                             val env = 1f - (i.toFloat() / bufSize)
@@ -239,40 +266,35 @@ object SoundSynth {
                             val s2 = sin(2.0 * Math.PI * (freq * 1.5f) * t) * 0.25f // Harmonizing fifth
                             soundBuffer[i] = ((s1 + s2) * 5500 * env).toInt().toShort()
                         }
-                        
-                        bgmTrack.write(soundBuffer, 0, soundBuffer.size)
+
+                        bgmTrack.write(soundBuffer, 0, soundBuffer.size) // blocks when buffer is full
                         melodyIdx = (melodyIdx + 1) % melody.size
-                        
-                        delay(noteLengthMs.toLong() - 20)
                     }
                 } else if (type == "BATTLE") {
                     // High-adrenaline fast tension loop
                     val bassLine = floatArrayOf(110.00f, 116.54f, 130.81f, 116.54f, 110.00f, 110.00f, 130.81f, 146.83f)
                     var stepIdx = 0
-                    
+
                     while (isActive && !isMuted && currentBgmType == "BATTLE") {
                         val freq = bassLine[stepIdx]
-                        val noteLengthMs = 300
                         val bufSize = (SAMPLE_RATE * (noteLengthMs / 1000f)).toInt()
                         val soundBuffer = ShortArray(bufSize)
-                        
+
                         for (i in 0 until bufSize) {
                             val t = i.toFloat() / SAMPLE_RATE
                             val env = 1f - (i.toFloat() / bufSize)
                             val rawVal = sin(2.0 * Math.PI * freq * t)
                             val squareVal = if (rawVal > 0.0) 1.0 else -1.0
-                            
+
                             val beatTick = if (stepIdx % 2 == 0 && i < bufSize * 0.15) {
                                 (Math.random() * 2.0 - 1.0) * 0.45
                             } else 0.0
-                            
+
                             soundBuffer[i] = ((squareVal * 0.35 + beatTick) * 7500 * env).toInt().toShort()
                         }
-                        
-                        bgmTrack.write(soundBuffer, 0, soundBuffer.size)
+
+                        bgmTrack.write(soundBuffer, 0, soundBuffer.size) // blocks when buffer is full
                         stepIdx = (stepIdx + 1) % bassLine.size
-                        
-                        delay(noteLengthMs.toLong() - 20)
                     }
                 }
 
@@ -280,7 +302,7 @@ object SoundSynth {
                     bgmTrack.stop()
                     bgmTrack.release()
                 } catch (e: Exception) {
-                    // Ignore
+                    // ignore
                 }
             } catch (e: Exception) {
                 Log.e("SoundSynth", "Bgm loop crash", e)

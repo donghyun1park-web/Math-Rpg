@@ -749,6 +749,11 @@ class GameViewModel(private val repository: GameRepository) : ViewModel() {
             isGameOver = false
         )
     }
+
+    override fun onCleared() {
+        super.onCleared()
+        SoundSynth.release()
+    }
 }
 
 class GameViewModelFactory(private val repository: GameRepository) : ViewModelProvider.Factory {
