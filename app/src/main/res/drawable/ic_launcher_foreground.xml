@@ -1,0 +1,43 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Shield / Crest Background -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M54,15 C65,15 78,20 78,35 C78,60 54,85 54,85 C54,85 30,60 30,35 C30,20 43,15 54,15 Z" />
+
+    <!-- Centered Sword -->
+    <!-- Blade (Silver/White) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,25 L56,25 L57,60 L51,60 Z" />
+    <!-- Point of Sword -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,25 L54,20 L56,25 Z" />
+    <!-- Guard -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M44,60 L64,60 L64,64 L44,64 Z" />
+    <!-- Grip / Handle -->
+    <path
+        android:fillColor="#90A4AE"
+        android:pathData="M52,64 L56,64 L56,76 L52,76 Z" />
+    <!-- Pommel -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M51,76 L57,76 L57,80 L51,80 Z" />
+
+    <!-- Plus operator (+) on Top-Left -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M24,42 L30,42 L30,48 L34,48 L34,42 L40,42 L40,38 L34,38 L34,32 L30,32 L30,38 L24,38 Z" />
+
+    <!-- Minus operator (-) on Top-Right -->
+    <path
+        android:fillColor="#81C784"
+        android:pathData="M68,40 L84,40 L84,36 L68,36 Z" />
+</vector>

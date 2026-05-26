@@ -1,0 +1,6 @@
+{
+  "name": "수학 몬스터 배틀",
+  "description": "초등학교 어린이를 위한 신나는 수학 몬스터 배틀 게임! 두 자릿수와 한 자릿수의 더하기와 빼기 문제를 맞춰 몬스터를 무찌르세요.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
